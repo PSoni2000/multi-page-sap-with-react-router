@@ -125,6 +125,8 @@ export default RootLayout;
 
 here /<Outlet> will mark the place where the child routes elements render to.
 
+### Nesting Wrappers in routes
+
 ## Showing error page with errorElement
 
 ```
