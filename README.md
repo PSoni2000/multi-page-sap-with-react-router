@@ -742,7 +742,7 @@ Now as this event data should be send to the backend. we have to convert it to J
 
 Now if you want to navigate user to a different page after successfully submitting the form. to do that you can return the result of calling Redirect.
 
-like json, redirect creates a response object, however its a special response object that simply redirect he user to a different page.
+like json, redirect creates a response object, however its a special response object that simply redirect the user to a different page.
 
 ## Submitting data Programmatically
 
@@ -841,12 +841,12 @@ it gives us access to the data returned by action. just like useLoaderData() hoo
 ## Behind the scenes work with useFetcher()
 
 useFetcher() hook - when executed give an object and this object includes a bunch of useful properties and methods.
-for example - it gives you another form component which is different form that other form component which we use before.
-it also gives us a submit function which is different form submit function we got from useSubmit.
+for example - it gives you another 'Form' component which is different form that other 'Form' component which we use before.
+it also gives us a 'submit' function which is different form 'submit' function we got from useSubmit.
 
-if we use this fetcher form component then this will still trigger an action but it will not initialize a route transition.
+_if we use this fetcher Form component then this will still trigger an action but it will not initialize a route transition._
 
-so fetcher should basically be used whenever you wanna trigger an action/loader with the help of form/load function without actually navigating to the page to which the action/loader belongs.
+_so fetcher should basically be used whenever you wanna trigger an action/loader with the help of form/load function without actually navigating to the page to which the action/loader belongs._
 
 **useFetcher() hook -** is basically the tool you should use if you wanna interact with some action or a loader without transitioning.
 
@@ -888,4 +888,137 @@ function NewsletterSignup() {
 }
 
 export default NewsletterSignup;
+```
+
+## Deferring Data Fetching with defer()
+
+When we want to load this page before data is there and show some parts of the page already until all the data is there.
+![Alt text](images/image.png)
+for example, here it would make sense to show 'All Events' & 'New Event' buttons already until all the data is there.
+
+that's where we can defer loading and tell react-router that we actually wanna render a component already even though the data is not fully there yet.
+
+1. Creating defer -
+
+```
+import { json, defer } from 'react-router-dom';
+
+async function loadEvents() {
+  const response = await fetch('http://localhost:8080/events');
+
+  if (!response.ok) {
+    throw json(
+      { message: 'Could not fetch events.' },
+      { status: 500, }
+    );
+  } else {
+    const resData = await response.json();
+    return resData.events;
+    // return response; - does not work with defer. So, we have to manually parse the data.
+  }
+}
+
+export function loader() {
+  return defer({
+    events: loadEvents(), // Yes, we execute it here to get promise.
+  });
+}
+```
+
+2. getting defer data
+
+```
+import { Suspense } from 'react';
+import { useLoaderData, Await } from 'react-router-dom';
+
+import EventsList from '../components/EventsList';
+
+function EventsPage() {
+  const { events } = useLoaderData();
+
+  return (
+    <Suspense fallback={<p style={{ textAlign: 'center' }}>Loading...</p>}>
+      <Await resolve={events}>
+        {(loadedEvents) => <EventsList events={loadedEvents} />}
+      </Await>
+    </Suspense>
+  );
+}
+```
+
+/<Await> - Await component will wait for events data to be there.
+/<Suspense> - The Suspense component can be used in certain situations to show a fallback whilst we're waiting for other data to arrive.
+
+## Controlling Which Data Should be deferred.
+
+1. Creating Defer -
+
+```
+async function loadEvent(id) {
+  const response = await fetch('http://localhost:8080/events/' + id);
+
+  if (!response.ok) {
+    throw json(
+      { message: 'Could not fetch details for selected event.' },
+      {
+        status: 500,
+      }
+    );
+  } else {
+    const resData = await response.json();
+    return resData.event;
+  }
+}
+
+async function loadEvents() {
+  const response = await fetch('http://localhost:8080/events');
+
+  if (!response.ok) {
+    throw json(
+      { message: 'Could not fetch events.' },
+      {
+        status: 500,
+      }
+    );
+  } else {
+    const resData = await response.json();
+    return resData.events;
+  }
+}
+
+export async function loader({ request, params }) {
+  const id = params.eventId;
+
+  return defer({
+    event: await loadEvent(id),
+    events: loadEvents(),
+  });
+}
+```
+
+If we have an async loader with async function, you can simply add the await keyword here and that will make sure that defer waits for this data to be loaded before loading this page component at all. but this will load non await data after the page is loaded.
+
+2. getting defer data
+
+```
+function EventDetailPage() {
+  const { event, events } = useRouteLoaderData('event-detail');
+
+  return (
+    <>
+      <Suspense fallback={<p style={{ textAlign: 'center' }}>Loading...</p>}>
+        <Await resolve={event}>
+          {(loadedEvent) => <EventItem event={loadedEvent} />}
+        </Await>
+      </Suspense>
+      <Suspense fallback={<p style={{ textAlign: 'center' }}>Loading...</p>}>
+        <Await resolve={events}>
+          {(loadedEvents) => <EventsList events={loadedEvents} />}
+        </Await>
+      </Suspense>
+    </>
+  );
+}
+
+export default EventDetailPage;
 ```
